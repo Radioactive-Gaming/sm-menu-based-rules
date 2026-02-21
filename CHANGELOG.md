@@ -10,6 +10,12 @@
 * Fixed numerous type mismatches.
 * Added explicit return values for Action functions.
 
+## [1.5.2] 2026-02-21
+
+### Fixed
+
+* Replaced deprecated GetMaxClients function with MaxClients.
+* Replaced deprecated GetClientAuthString function with GetClientAuthId.
 
 ## [1.5.1] 2008-10-29
 
