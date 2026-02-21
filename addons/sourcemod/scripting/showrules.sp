@@ -2,7 +2,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <clientprefs>
-#define VERSION "1.5.1" 
+#define VERSION "1.5.2" 
 
 new String:clientname[MAX_NAME_LENGTH];
 new String:language[4];
@@ -38,7 +38,7 @@ new Handle:g_cookie = INVALID_HANDLE;
 public Plugin:myinfo =
 {
 	name = "Menu Based Rules",
-	author = "XARiUS",
+	author = "XARiUS, X8ETr1x",
 	description = "Display menu of rules to clients when they join a server, or by console command.",
 	version = "1.5.1",
 	url = "http://www.the-otc.com/"
@@ -242,11 +242,10 @@ public Action:UserMsg_VGUIMenu(UserMsg:msg_id, Handle:bf, const players[], playe
   {
     g_IntermissionCalled = true;
 
-    new maxplayers = GetMaxClients();
     playeridcount = 0;
 
-    for (new i = 1; i <= maxplayers; i++) {
-            if (IsClientInGame(i) && !IsFakeClient(i) && GetClientAuthString(i, playerid[playeridcount], sizeof(playerid[]))) {
+    for (new i = 1; i <= MaxClients; i++) {
+            if (IsClientInGame(i) && !IsFakeClient(i) && GetClientAuthId(i, AuthId_Steam2, playerid[playeridcount], sizeof(playerid[]))) {
             playeridcount++;
         }
       }
@@ -301,10 +300,10 @@ public OnClientPostAdminCheck(client)
       g_AdminChecked[client] = true;
       // Search through playerid array to see if user was here for map change.
       prevclient = false;
-      GetClientAuthString(client, steamid, 64);
+      GetClientAuthId(client, AuthId_Steam2, steamid, 64);
       playeridcount = 0;
-      new maxplayers = GetMaxClients();
-      for (new i = 1; i <= maxplayers; i++) 
+
+      for (new i = 1; i <= MaxClients; i++) 
       {
         if (StrEqual(steamid,playerid[playeridcount]))
         {
