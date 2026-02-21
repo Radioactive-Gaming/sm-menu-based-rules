@@ -7,7 +7,7 @@
 
 #define PLUGIN_NAME "Menu Based Rules"
 #define PLUGIN_AUTHOR "XARiUS, X8ETr1x"
-#define PLUGIN_VERSION "1.6.0"
+#define PLUGIN_VERSION "1.6.1"
 #define PLUGIN_URL "https://github.com/Radioactive-Gaming/sm-menu-based-rules/"
 #define PLUGIN_DESC "Display menu of rules to clients when they join a server, or by console command."
 
@@ -91,7 +91,7 @@ public void OnPluginStart() {
 
 	HookUserMessage(g_VGUIMenu, UserMsg_VGUIMenu);
 
-	AutoExecConfig(true, "showrules");
+	AutoExecConfig(true);
 
 }
 
@@ -629,3 +629,4 @@ public Action Show_Rules(int client) {
         return Plugin_Handled;
 
 }
+
