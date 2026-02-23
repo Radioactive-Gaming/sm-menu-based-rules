@@ -5,9 +5,8 @@ A fork of [XARIUS'S plugin](https://forums.alliedmods.net/showthread.php?t=72788
 This plugin will automatically display a list of rules in a menu panel to all connecting clients. 
 
 Features:
-* a command line option for admins to display the rules to an individual user (or group, @all etc..).
+* A command line option for admins to display the rules to an individual user (or group, @all etc..).
 * Clients then have the choice of either agreeing, or disagreeing to the rules and conditions presented to them. If they agree, they recieve a nice message. If they disagree, they get kicked (also with a nice message).
-* Plays a welcome sound to all connecting clients. The sound will not play on map change.
 * If the menu dissolves or gets cancelled, the user WILL get kicked after menutime expires! This prevents people from cancelling the menu with another menu, or ignoring it all together.
 * The rules are defined in showrulesdata.phrases.txt. This gives you the ability to have multi-lingual rules. There are 10 rule lines available. If you don't need 10, simply leave the unused ones blank. Do not rewmove the unused lines, it will cause errors.
 
@@ -44,11 +43,6 @@ sm_showrules_enabled "1"
 // -
 // Default: "24"
 sm_showrules_expiration "24"
-
-// Sound file to play to connecting clients.  Relative to the sound/ folder.  Example: 'welcome.mp3' or 'mysounds/welcome.mp3'
-// -
-// Default: ""
-sm_showrules_joinsound ""
 
 // Time to display rules menu to client before dissolving (and kicking them).
 // -
