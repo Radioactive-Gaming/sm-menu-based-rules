@@ -1,3 +1,34 @@
+## [2.0.0] 2026-02-23
+
+A mostly re-write of the original plugin. This version updates the plugin to modern flows and standards, as well as adds additiona error notification to log and console.
+
+### Added
+
+* Error detection and logging to file and console for unexpected results in if statements.
+* Explicit definitions of static values with less reliance on sizeof().
+
+### Changed
+
+* Major formatting changes.
+* Reduction in reliance on global variables.
+* Functions are restricted to require scopes.
+* Made loops and if statements mroe explicit wherever possible.
+* Reduced duplicate code.
+
+### Fixed
+
+* Multiple logic collisions that would prevent code from running under unexpected conditions.
+
+### Removed
+
+* Join sound options and code.
+
+## [1.6.1] 2026-02-21
+
+### Changed
+
+* Updated AutoExecConfig to follow naming standards.
+
 ## [1.6.0] 2026-02-21
 
 ### Changed
