@@ -5,43 +5,58 @@
 #include <sdktools>
 #include <clientprefs>
 
+#define LANGUAGE_LENGTH 3
+#define LANGUAGE_CODE_LENGTH 3
 #define PLUGIN_NAME "Menu Based Rules"
 #define PLUGIN_AUTHOR "XARiUS, X8ETr1x"
-#define PLUGIN_VERSION "1.6.1"
+#define PLUGIN_VERSION "2.0.0"
 #define PLUGIN_URL "https://github.com/Radioactive-Gaming/sm-menu-based-rules/"
 #define PLUGIN_DESC "Display menu of rules to clients when they join a server, or by console command."
 
-char    clientname[MAX_NAME_LENGTH];
-char    language[4];
-char    languagecode[4];
-char    playerid[MAXPLAYERS + 1][64];
-char    steamid[64];
-char    g_joinsound[PLATFORM_MAX_PATH];
-int     playeridcount;
-int     NumTries = 1;
-int     g_expiration;
+////////////////////////////////////////////////////////////////////////////////
+//
+// VARIABLES
+//
+////////////////////////////////////////////////////////////////////////////////
+
+// CVar handles, defined in OnPluginStart().
+Handle  g_CvarEnabled;
+Handle  g_CvarMenuTime;
+Handle  g_CvarShowOnJoin;
+Handle  g_CvarShowToAdmins;
+Handle  g_CvarDisplayAttempts;
+Handle  g_CvarDisplayFailureKick;
+Handle  g_CvarShowMenuOptions;
+Handle  g_CvarExpiration;
+
+// Variables used to change CVar handle values after AutoExecConfig()
+bool    g_displayFailureKick;                   // Maps to g_CvarDisplayFailureKick.
+bool    g_pluginEnabled;                        // Maps to g_CvarEnabled.
+bool    g_showMenuOptions;                      // Maps to g_CvarShowMenuOptions.
+bool    g_showOnJoin;                           // Maps to g_CvarShowOnJoin.
+bool    g_showToAdmins;                         // Maps to g_CvarShowToAdmins.
+int     g_displayAttempts;                      // Maps to g_CvarDisplayAttempts.
+int     g_expiration;                           // Maps to g_CvarExpiration
+int     g_menuTime;                             // Maps to g_CvarMenuTime.
+
+// Player data
+bool    g_CookieExists[MAXPLAYERS];             // Tracks if the timer cookie exists for the player.
+bool    g_CookiesCached[MAXPLAYERS];            // Tracks if the players cookies have been cached.
+bool    g_IntermissionCalled;                   // Tracks if a player is intermission i.e. after a player has died and is waiting to spawn.  
+char    g_clientName[MAX_NAME_LENGTH];          // Tracks player display name. Used for messages to the server chat.
+Handle  g_cookie;                               // The read-only client cookie that sets an expiration time stamp.
+ 
+
+// Menu and language settings
+char    language[LANGUAGE_LENGTH];              // The language code of the server.
+char    languageCode[LANGUAGE_CODE_LENGTH];     // Follows ISO 639 https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes
 UserMsg g_VGUIMenu;
-bool    prevclient;
-bool    g_AdminChecked[MAXPLAYERS + 1];
-bool    g_CookiesCached[MAXPLAYERS + 1];
-bool    g_IntermissionCalled;
-bool    g_enabled;
-bool    g_showonjoin;
-bool    g_showtoadmins;
-bool    g_displayfailurekick;
-bool    g_showmenuoptions;
-int     g_menutime;
-int     g_displayattempts;
-Handle  g_Cvarenabled;
-Handle  g_Cvarmenutime;
-Handle  g_Cvarshowonjoin;
-Handle  g_Cvarshowtoadmins;
-Handle  g_Cvardisplayattempts;
-Handle  g_Cvardisplayfailurekick;
-Handle  g_Cvarshowmenuoptions;
-Handle  g_Cvarjoinsound;
-Handle  g_Cvarexpiration;
-Handle  g_cookie;
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// ENUMS
+//
+////////////////////////////////////////////////////////////////////////////////
 
 public Plugin myinfo = {
 	name        = PLUGIN_NAME,
@@ -51,232 +66,250 @@ public Plugin myinfo = {
 	url         = PLUGIN_URL
 };
 
-public void OnPluginStart() {
+////////////////////////////////////////////////////////////////////////////////
+//
+// MAIN
+//
+////////////////////////////////////////////////////////////////////////////////
 
+public void OnPluginStart() {
+	
+	// Load translation files
 	LoadTranslations("common.phrases");
 	LoadTranslations("showrules.phrases");
 	LoadTranslations("showrulesdata.phrases");
-  
-	g_cookie = RegClientCookie("showrules", "Rules Agreement Timestamp", CookieAccess_Protected);
-	GetLanguageInfo(GetServerLanguage(), languagecode, sizeof(languagecode), language, sizeof(language));
-  
-	CreateConVar("sm_showrules_version", PLUGIN_VERSION, "Menu Rules Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
-	g_Cvarenabled = CreateConVar("sm_showrules_enabled", "1", "Enable this plugin.  0 = Disabled.");
-	g_Cvarjoinsound = CreateConVar("sm_showrules_joinsound", "", "Sound file to play to connecting clients.  Relative to the sound/ folder.  Example: 'welcome.mp3' or 'mysounds/welcome.mp3'");
-	g_Cvarmenutime = CreateConVar("sm_showrules_menutime", "120", "Time to display rules menu to client before dissolving (and kicking them).");
-	g_Cvarshowonjoin = CreateConVar("sm_showrules_showonjoin", "1", "Display Rules menu to clients automatically upon joining the server.");
-	g_Cvarshowtoadmins = CreateConVar("sm_showrules_showtoadmins", "0", "On join, display menu to admins.");
-	g_Cvardisplayattempts = CreateConVar("sm_showrules_displayattempts", "20", "Number of times to attempt to display the rules menu. (3 second intervals)");
-	g_Cvardisplayfailurekick = CreateConVar("sm_showrules_displayfailurekick", "1", "Kick the client if the rules cannot be displayed after defined display attempts.");
-	g_Cvarshowmenuoptions = CreateConVar("sm_showrules_showmenuoptions", "1", "Shows agree/disagree options instead of a single option to close the rules menu.");
-	g_Cvarexpiration = CreateConVar("sm_showrules_expiration", "24", "Number of hours before the previous terms agreement expires.");
 	
+        // Set the language for the translations
+	int serverLanguage = GetServerLanguage();
+	GetLanguageInfo(serverLanguage, languageCode, LANGUAGE_CODE_LENGTH, language, LANGUAGE_LENGTH);
+  
+	// Register a cookie for the time of rule acceptance.
+	g_cookie = RegClientCookie("showrules", "Rules Agreement Timestamp", CookieAccess_Protected);
+	
+	// Late load support to ensure cookies are loaded for all players.
+	for (int i = MaxClients; i > 0; --i) {
+        
+                if (AreClientCookiesCached(i) == false) {
+            
+                        continue;
+                
+                }
+                
+                else if (AreClientCookiesCached(i) == true) {
+        
+                        OnClientCookiesCached(i);
+                        
+                }
+                
+                else {
+                
+                        LogMessage("[ERROR] OnPluginStart(): AreClientCookiesCached contains a non-boolean value.");
+                        
+                        continue;
+                        
+                }
+        
+        }
+        
+	// Set CVars 
+	CreateConVar("sm_showrules_version", PLUGIN_VERSION, "Menu Rules Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	g_CvarEnabled = CreateConVar("sm_showrules_enabled", "1", "Enable this plugin.  0 = Disabled.");
+	g_CvarMenuTime = CreateConVar("sm_showrules_menutime", "120", "Time to display rules menu to client before dissolving (and kicking them).");
+	g_CvarShowOnJoin = CreateConVar("sm_showrules_showonjoin", "1", "Display Rules menu to clients automatically upon joining the server.");
+	g_CvarShowToAdmins = CreateConVar("sm_showrules_showtoadmins", "0", "On join, display menu to admins.");
+	g_CvarDisplayAttempts = CreateConVar("sm_showrules_displayattempts", "20", "Number of times to attempt to display the rules menu. (3 second intervals)");
+	g_CvarDisplayFailureKick = CreateConVar("sm_showrules_displayfailurekick", "1", "Kick the client if the rules cannot be displayed after defined display attempts.");
+	g_CvarShowMenuOptions = CreateConVar("sm_showrules_showmenuoptions", "1", "Shows agree/disagree options instead of a single option to close the rules menu.");
+	g_CvarExpiration = CreateConVar("sm_showrules_expiration", "24", "Number of hours before the previous terms agreement expires.");
+	
+	// Register server commands
 	RegAdminCmd("sm_showrules", Command_rules, ADMFLAG_KICK, "sm_showrules <#userid|name>");
 
-	HookConVarChange(g_Cvarenabled, OnSettingChanged);
-	HookConVarChange(g_Cvarmenutime, OnSettingChanged);
-	HookConVarChange(g_Cvarshowonjoin, OnSettingChanged);
-	HookConVarChange(g_Cvarshowtoadmins, OnSettingChanged);
-	HookConVarChange(g_Cvardisplayattempts, OnSettingChanged);
-	HookConVarChange(g_Cvardisplayfailurekick, OnSettingChanged);
-	HookConVarChange(g_Cvarshowmenuoptions, OnSettingChanged);
-	HookConVarChange(g_Cvarexpiration, OnSettingChanged);
+	// Create hooks for custom CVar values
+	HookConVarChange(g_CvarEnabled, OnSettingChanged);
+	HookConVarChange(g_CvarMenuTime, OnSettingChanged);
+	HookConVarChange(g_CvarShowOnJoin, OnSettingChanged);
+	HookConVarChange(g_CvarShowToAdmins, OnSettingChanged);
+	HookConVarChange(g_CvarDisplayAttempts, OnSettingChanged);
+	HookConVarChange(g_CvarDisplayFailureKick, OnSettingChanged);
+	HookConVarChange(g_CvarShowMenuOptions, OnSettingChanged);
+	HookConVarChange(g_CvarExpiration, OnSettingChanged);
 	
+	// Check for the VGUIMenu state
 	g_VGUIMenu = GetUserMessageId("VGUIMenu");
   
 	if (g_VGUIMenu == INVALID_MESSAGE_ID) {
-		LogError("FATAL: Cannot find VGUIMenu user message id.");
+	
+		LogError("[CRITICAL] Cannot find VGUIMenu user message id.");
 		SetFailState("VGUIMenu Not Found");
+	
 	}
+	
+	else {
 
-	HookUserMessage(g_VGUIMenu, UserMsg_VGUIMenu);
+	        HookUserMessage(g_VGUIMenu, UserMsg_VGUIMenu);
+	        
+        }
 
+	// Execute the configuration
 	AutoExecConfig(true);
+	LogMessage("[INFO] Plugin loaded.");
 
 }
 
 public void OnConfigsExecuted() {
 
-	g_enabled = GetConVarBool(g_Cvarenabled);
-	g_menutime = GetConVarInt(g_Cvarmenutime);
-	g_showonjoin = GetConVarBool(g_Cvarshowonjoin);
-	g_showtoadmins = GetConVarBool(g_Cvarshowtoadmins);
-	g_displayattempts = GetConVarInt(g_Cvardisplayattempts);
-	g_displayfailurekick = GetConVarBool(g_Cvardisplayfailurekick);
-	g_showmenuoptions = GetConVarBool(g_Cvarshowmenuoptions);
-	g_expiration = GetConVarInt(g_Cvarexpiration) * 3600;
-	GetConVarString(g_Cvarjoinsound, g_joinsound, sizeof(g_joinsound));
-	char buffer[PLATFORM_MAX_PATH];
-
-	if (StrEqual(g_joinsound, "", false) == false) {
-		
-		Format(buffer, PLATFORM_MAX_PATH, "sound/%s", g_joinsound);
-
-		if (FileExists(buffer, false)) {
-
-			Format(buffer, PLATFORM_MAX_PATH, "%s", g_joinsound);
-
-			if (!PrecacheSound(buffer, true)) {
-	
-				LogError("Menu Based Rules: Could not pre-cache defined sound: %s", buffer);
-				SetFailState("Menu Based Rules: Could not pre-cache sound: %s", buffer);
-      
-			}
-      
-			else {
-        
-				Format(buffer, PLATFORM_MAX_PATH, "sound/%s", g_joinsound);
-				AddFileToDownloadsTable(buffer);
-      
-			}
-
-		}
-
-	}
+        // Convert CVars to required data types.
+	g_pluginEnabled = GetConVarBool(g_CvarEnabled);
+	g_menuTime = GetConVarInt(g_CvarMenuTime);
+	g_showOnJoin = GetConVarBool(g_CvarShowOnJoin);
+	g_showToAdmins = GetConVarBool(g_CvarShowToAdmins);
+	g_displayAttempts = GetConVarInt(g_CvarDisplayAttempts);
+	g_displayFailureKick = GetConVarBool(g_CvarDisplayFailureKick);
+	g_showMenuOptions = GetConVarBool(g_CvarShowMenuOptions);
+	g_expiration = GetConVarInt(g_CvarExpiration) * 3600;           // Convert from hours to seconds.
 
 }
 
-public void OnSettingChanged(Handle convar, const char[] oldValue, const char[] newValue) {
-
-        if (convar == g_Cvarmenutime) {
-
-                g_menutime = StringToInt(newValue);
-
-        }
-
-        if (convar == g_Cvardisplayattempts) {
-        
-                g_displayattempts = StringToInt(newValue);
-
-        }
-
-        if (convar == g_Cvarexpiration) {
-        
-                g_expiration = StringToInt(newValue) * 3600;
-
-        }
-
-        if (convar == g_Cvarenabled) {
-
-                if (newValue[0] == '1') {
-		
-		        g_enabled = true;
-                }
-
-                else {
+public void OnClientPostAdminCheck(int client) {
+   
+        // Skip everything if the plugin is set to disabled.
+        if (g_pluginEnabled == true) {
                 
-                        g_enabled = false;
-                
-                }
-                
-        }
-
-        if (convar == g_Cvardisplayfailurekick) {
-
-                if (newValue[0] == '1') {
-			
-		        g_displayfailurekick = true;
-                }
-
-                else {
-      
-                        g_displayfailurekick = false;
-                
-                }
-  
-        }
-
-        if (convar == g_Cvarshowmenuoptions) {
-    
-                if (newValue[0] == '1') {
-			
-			g_showmenuoptions = true;
-                
-                }
-
-                else {
-      
-                        g_showmenuoptions = false;
-  
-                }
-  
-        }
-
-        if (convar == g_Cvarshowonjoin) {
-
-                if (newValue[0] == '1') {
-			
-			g_showonjoin = true;
-                }
-                
-                else {
-      
-                        g_showonjoin = false;
-    
-                }
-        
-        }
-  
-        if (convar == g_Cvarshowtoadmins) {
-    
-                if (newValue[0] == '1') {
-			
-			g_showtoadmins = true;
-                
-                }
-    
-                else {
-      
-                        g_showtoadmins = false;
-    
-                }
-  
-        }
-
-}
-
-public Action PlayJoinSound(Handle timer, any client) {
-
-        if (!StrEqual(g_joinsound, "")) {
-                
-                EmitSoundToClient(client, g_joinsound);
-
-        }
-
-        return Plugin_Handled;
-
-}
-
-public Action CheckForMenu(Handle timer, any client) {
-
-        if (GetClientMenu(client) == MenuSource_None && IsClientConnected(client) && IsClientInGame(client)) {
-
-                Show_Rules(client);
-                NumTries = 1;
-    
-                return Plugin_Stop;
-        }
-         
-        else {
-    
-                if (NumTries++ >= g_displayattempts) {
-      
-                        NumTries = 1;
-      
-                        if (g_displayfailurekick) {
-      
-                                CreateTimer(0.5, KickPlayer, client);
-      
+                // Skip automatic rule display if disabled.                
+                if (g_showOnJoin ==  true) {
+                        
+                        /* 
+                        Check for a race condition with OnClientCookiesCached().
+                        
+                        This is unlikely as the client cookies on modern servers are typically 
+                        cached far faster than the admin check completes. However, it is good to
+                        catch it regardless.
+                        */
+                        for (int i = 0; i < 50; i++) {
+                        
+                                if (g_CookiesCached[client] == false) {
+                        
+                                        OnClientCookiesCached(client);
+                        
+                                }
+                                
+                                else if (g_CookiesCached[client] == true) {
+                                
+                                        i = 50;
+                                        
+                                }
+                        
                         }
-      
-                        return Plugin_Stop;
-    
+                        
+                        // Skip if it's a bot.
+                        if (IsFakeClient(client) == true) {
+                                
+                                return;
+                                
+                        }
+                        
+                        else if (IsFakeClient(client) == false) {
+                                
+                                // Skip if the player is an admin.
+                                if (g_showToAdmins == false) {
+                                                
+                                        AdminId adminID = GetUserAdmin(client);
+                                                
+                                        if (adminID != INVALID_ADMIN_ID) {
+                                                
+                                                bool isAdmin = GetAdminFlag(adminID, Admin_Generic, Access_Effective); 
+                                                                                                                                              
+                                                if (isAdmin == true) {
+                                                        
+                                                        return;
+                                                                
+                                                }
+                                                
+                                        }
+                                                
+                                }
+                                
+                                if (g_CookieExists[client] == true) {
+                                        
+                                        char cookie[255];
+                                        GetClientCookie(client, g_cookie, cookie, sizeof(cookie));
+                                        int cookieTimeStamp = StringToInt(cookie);
+                                        int cookieAge = GetTime() - cookieTimeStamp;
+                                        
+                                        if (cookieAge < g_expiration) {
+                                                
+                                                return;
+        
+                                        }
+        
+                                        else if (cookieAge >= g_expiration) {
+                                                
+                                                CreateTimer(3.0, CheckForMenu, client, TIMER_REPEAT);
+                
+                                        }
+                                        
+                                }
+                        
+                        }
+                        
+                        else {
+
+                                LogMessage("[ERROR] Unexpected result in OnClientPostAdminCheck(): IsFakeClient() must return a boolean result.");
+                
+                        }
+
+                }
+        
+                else if (g_showOnJoin ==  false) {
+        
+                        return;
+                
+                }
+        
+                else {
+        
+                        LogMessage("[ERROR] Unexpected result in OnClientPostAdminCheck(): g_showOnJoin must be a boolean value.");
+                
                 }
   
         }
-  
-        return Plugin_Continue;
+        
+        else if (g_pluginEnabled == false) {
+        
+                return;
+        
+        }
+        
+        else {
+        
+                LogMessage("[ERROR] Unexpected result in OnClientPostAdminCheck(): g_pluginEnabled must be a boolean value.");
+        
+        }
 
+}
+
+public void OnClientCookiesCached(int client) {
+
+        // Track that cookies have been cached.
+        g_CookiesCached[client] = true;
+        
+        // Check for the timer expiration cookie.
+        char cookie[255];
+        GetClientCookie(client, g_cookie, cookie, sizeof(cookie));
+        
+        if (IsNullString(cookie) == true) {
+
+                g_CookieExists[client] = false;
+                                        
+        }
+        
+        else if (IsNullString(cookie) == false) {
+
+                g_CookieExists[client] = true;
+                                                
+        }
+        
 }
 
 public void OnMapEnd() {
@@ -285,154 +318,261 @@ public void OnMapEnd() {
 
 }
 
-public Action UserMsg_VGUIMenu(UserMsg msg_id, Handle bf, const int[] players, int playersNum, bool reliable, bool init) {
+public void OnSettingChanged(ConVar convar, const char[] oldValue, const char[] newValue) {
 
-        if (g_IntermissionCalled) {
+        if (convar == g_CvarMenuTime) {
                 
-                return Plugin_Handled;
-        
-        }
-  
-        char type[15];
+                g_menuTime = StringToInt(newValue);
 
-        /* If we don't get a valid string, bail out. */
-        if (BfReadString(bf, type, sizeof(type)) < 0) {
+        }
+
+        else if (convar == g_CvarDisplayAttempts) {
+        
+                g_displayAttempts = StringToInt(newValue);
+
+        }
+
+        else if (convar == g_CvarExpiration) {
+        
+                g_expiration = StringToInt(newValue) * 3600;
+
+        }
+
+        else if (convar == g_CvarEnabled) {
+
+                if (newValue[0] == '1') {
+		
+		        g_pluginEnabled = true;
+                        LogMessage("[INFO] Plugin enabled, executing.");
                 
-                return Plugin_Handled;
-        
-        }
- 
-        if (BfReadByte(bf) == 1 && BfReadByte(bf) == 0 && (strcmp(type, "scores", false) == 0)) {
-    
-                g_IntermissionCalled = true;
-                playeridcount = 0;
+                }
 
-                for (int i = 1; i <= MaxClients; i++) {
-            
-                        if (IsClientInGame(i) && !IsFakeClient(i) && GetClientAuthId(i, AuthId_Steam2, playerid[playeridcount], sizeof(playerid[]))) {
-            
-                                playeridcount++;
-        
-                        }
+                else if (newValue[0] == '0') {
+                
+                        g_pluginEnabled = false;
+                        LogMessage("[INFO] Plugin disabled.");
+                
+                }
+                
+                else {
+                
+                        LogMessage("[ERROR] Unexpected value for sm_showrules_enabled.");
+                
+                }
+                
+        }
+
+        else if (convar == g_CvarDisplayFailureKick) {
+
+                if (newValue[0] == '1') {
+			
+		        g_displayFailureKick = true;
+		        LogMessage("[INFO] Kicking players on menu display failure.");
+                }
+
+                else if (newValue[0] == '0') {
       
+                        g_displayFailureKick = false;
+                        LogMessage("[INFO] Ignoring menu display failures.");
+                
+                }
+                
+                else {
+                
+                        LogMessage("[ERROR] Unexpected value for sm_showrules_displayfailurekick.");
+                
                 }
   
         }
-  
-        return Plugin_Handled;
 
-}
-
-public void CheckCookies(int client) {
-
-        g_AdminChecked[client] = false;
-        g_CookiesCached[client] = false;
-        char cookie[64];
-        GetClientCookie(client, g_cookie, cookie, sizeof(cookie));
-  
-        if (StrEqual(cookie, "")) {
+        else if (convar == g_CvarShowMenuOptions) {
+    
+                if (newValue[0] == '1') {
+			
+			g_showMenuOptions = true;
+			LogMessage("[INFO] Menu options enabled.");
                 
-                CreateTimer(3.0, CheckForMenu, client, TIMER_REPEAT);
+                }
+
+                else if (newValue[0] == '0') {
+      
+                        g_showMenuOptions = false;
+                        LogMessage("[INFO] Menu options disabled.");
+  
+                }
+                
+                else {
+                
+                        LogMessage("[ERROR] Unexpected value for sm_showrules_showmenuoptions.");
+                
+                }
+  
+        }
+
+        else if (convar == g_CvarShowOnJoin) {
+
+                if (newValue[0] == '1') {
+			
+			g_showOnJoin = true;
+			LogMessage("[INFO] Rules on join enabled.");
+                }
+                
+                else if (newValue[0] == '0') {
+      
+                        g_showOnJoin = false;
+                        LogMessage("[INFO] Rules on join disabled.");
+    
+                }
+                
+                else {
+                
+                        LogMessage("[ERROR] Unexpected value for sm_showrules_showonjoin.");
+                
+                }
         
         }
   
+        else if (convar == g_CvarShowToAdmins) {
+    
+                if (newValue[0] == '1') {
+			
+			g_showToAdmins = true;
+			LogMessage("[INFO] Rules to admins enabled.");
+                
+                }
+    
+                else if (newValue[0] == '0') {
+      
+                        g_showToAdmins = false;
+                        LogMessage("[INFO] Rules to admins disabled.");
+    
+                }
+                
+                else {
+                
+                        LogMessage("[ERROR] Unexpected value for sm_showrules_showtoadmins.");
+                
+                }
+  
+        }
+        
         else {
-    
-                int timestamp;
-                timestamp = StringToInt(cookie);
-    
-                if ((GetTime() - timestamp) > g_expiration) {
-      
-                        CreateTimer(3.0, CheckForMenu, client, TIMER_REPEAT);
-                
-                }
-  
+        
+                LogMessage("[WARN] Unexpected CVar, skipping.");
+        
         }
 
 }
 
-public void OnClientCookiesCached(int client) {
-  
-        g_CookiesCached[client] = true;
-  
-        if (g_AdminChecked[client]) {
+////////////////////////////////////////////////////////////////////////////////
+//
+// ACTIONS
+//
+////////////////////////////////////////////////////////////////////////////////
+
+Action CheckForMenu(Handle timer, int client) {
+
+        // Ensure the player is valid
+        if ((IsClientConnected(client) == true) && (IsClientInGame(client) == true)) {
                 
-                CheckCookies(client);
-  
-        }
-
-}
-
-public void OnClientPostAdminCheck(int client) {
-  
-        if (g_enabled) {
-    
-                if (g_showonjoin && IsClientConnected(client) && !IsFakeClient(client) && IsClientInGame(client)) {
-      
-                        GetClientName(client, clientname, sizeof(clientname));
-      
-                        if (!g_showtoadmins) {
-        
-                                AdminId isadmin = GetUserAdmin(client);
-        
-                                if (isadmin != INVALID_ADMIN_ID) {
-          
-                                        return;
+                // Try to display the menu up to the maximum tries.
+                for (int i; i <= g_displayAttempts; i++) {
                         
-                                }
-      
+                        MenuSource menuSrc = GetClientMenu(client);
+                        
+                        if (menuSrc == MenuSource_None) {
+                                
+                                Show_Rules(client);
+                                i = g_displayAttempts + 1;
+    
+                                return Plugin_Stop;
+                        
                         }
+                        
+                        else {
       
-                        g_AdminChecked[client] = true;
+                                if (i == g_displayAttempts) {
+                                
+                                        // Kick the player upon failure.
+                                        if (g_displayFailureKick == true) {
       
-                        // Search through playerid array to see if user was here for map change.
-                        prevclient = false;
-                        GetClientAuthId(client, AuthId_Steam2, steamid, sizeof(steamid));
-                        playeridcount = 0;
-
-                        for (int i = 1; i <= MaxClients; i++) {
-        
-                                if (StrEqual(steamid,playerid[playeridcount])) {
-          
-                                        prevclient = true;
-          
-                                        return;
+                                                CreateTimer(0.5, KickPlayer, client);
+                                                
+                                                return Plugin_Stop;
+      
+                                        }
+                                        
+                                        else {
+                                                
+                                                return Plugin_Continue;
+                                                
+                                        }
                                 
                                 }
-                                
-                                else {
-          
-                                        playeridcount++;
-        
-                                }
-      
-                        }
-      
-                        if (!prevclient) {
-        
-                                CreateTimer(1.0, PlayJoinSound, client);
-      
-                        }
-      
-                        if (g_CookiesCached[client]) {
-        
-                                CheckCookies(client);
-      
-                        }
     
-                }
-    
-                return;
+                        }
   
+                }
+                
+                return Plugin_Continue;
+                
+        }
+        
+        else {
+                
+                return Plugin_Continue;
+                
         }
 
 }
 
-public Action Command_rules(int client, int args) {
-  
-        char arg1[32];
-        GetCmdArg(1,arg1, sizeof(arg1));
-  
+Action UserMsg_VGUIMenu(UserMsg msg_id, Handle bf, const int[] players, int playersNum, bool reliable, bool init) {
+        
+        if (g_IntermissionCalled == true) {
+                
+                return Plugin_Handled;
+        
+        }
+        
+        else if (g_IntermissionCalled == false) {
+                
+                char type[4];
+                int strSize = BfReadString(bf, type, 4);
+
+                // Check for a valid menu handle string.
+                if (strSize < 0) {
+                        
+                        return Plugin_Handled;
+                
+                }
+         
+                else if (BfReadByte(bf) == 1 || BfReadByte(bf) == 0 || (strcmp(type, "scores", false) == 0)) {
+                        
+                        g_IntermissionCalled = true;
+ 
+                        return Plugin_Handled;
+          
+                }
+                
+                else {
+                        
+                        return Plugin_Handled;
+                        
+                }
+                
+        }
+        
+        else {
+                        
+                return Plugin_Handled;
+        
+        }
+
+}
+
+Action Command_rules(int client, int args) {
+         
+        // Check for the required number of arguments.
         if (args < 1) {
     
                 ReplyToCommand(client, "[SM] Usage: sm_showrules <#userid|name>");
@@ -440,73 +580,109 @@ public Action Command_rules(int client, int args) {
                 return Plugin_Handled;
   
         }
-
-        char Arguments[256];
-        GetCmdArgString(Arguments, sizeof(Arguments));
-        char arg[65];
-        char len = BreakString(Arguments, arg, sizeof(arg));
-
-        if (len == -1) {
-    
-                len = 0;
-                Arguments[0] = '\0';
-  
-        }
-
-        char target_name[MAX_TARGET_LENGTH];
-        int target_list[MAXPLAYERS];
-        int target_count;
-        bool tn_is_ml;
-
-        target_count = ProcessTargetString(arg, client, target_list, MAXPLAYERS, COMMAND_FILTER_CONNECTED, target_name, sizeof(target_name), tn_is_ml);
         
-        if (target_count <= 0) {
-        
-                ReplyToTargetError(client, target_count);
+        else if (args >= 1) {
 
-                return Plugin_Handled;
-  
-        }
-  
-        for (int i = 0; i < target_count; i++) {
+                // Grab the entire argument string.
+                char Arguments[256];
+                char arg[65];
                 
-                if (!IsClientConnected(target_list[i]) || IsFakeClient(target_list[i]) || !IsClientInGame(target_list[i])) {
-                        
-                        ReplyToCommand(client,"[SM] Client %s has not finished connecting or is timing out.  Please try again.", target_name);
-      
+                GetCmdArgString(Arguments, 256);
+                BreakString(Arguments, arg, 65);
+
+                // Search for the player based on the provided string.
+                char target_name[MAX_TARGET_LENGTH];
+                int target_list[MAXPLAYERS];
+                int target_count;
+                bool tn_is_ml;
+                
+                target_count = ProcessTargetString(arg, client, target_list, MAXPLAYERS, COMMAND_FILTER_CONNECTED, target_name, MAX_TARGET_LENGTH, tn_is_ml);
+                
+                // Return if there's no pattern match.
+                if (target_count <= 0) {
+                
+                        ReplyToTargetError(client, target_count);
+
                         return Plugin_Handled;
+          
+                }
+                
+                else if (target_count > 0) {
+          
+                        // Loop through the results.
+                        for (int i = 0; i < target_count; i++) {
+                                
+                                
+                                // Abort if the client is a bot or not yet in game.
+                                if ((IsClientConnected(target_list[i]) == false) || (IsFakeClient(target_list[i]) == true) || (IsClientInGame(target_list[i]) == false)) {
+                                        
+                                        ReplyToCommand(client, "[SM] Client %s has not finished connecting or is timing out.  Please try again.", target_name);
+                      
+                                        return Plugin_Handled;
+                                }
+                                
+                                else {
+                      
+                                        // Check the current menu status.
+                                        MenuSource menuSrc = GetClientMenu(client);
+                                        
+                                        if (menuSrc == MenuSource_None) {
+                        
+                                                Show_Rules(target_list[i]);
+                                                
+                                        }
+                                        
+                                        else {
+                        
+                                                CreateTimer(3.0, CheckForMenu, target_list[i], TIMER_REPEAT);
+                      
+                                        }
+                      
+                                        ReplyToCommand(client,"[SM] %t %s", "Client Command Success", target_name);
+                                        
+                                        return Plugin_Handled;
+                    
+                                }
+                  
+                        }
+                
+                        return Plugin_Handled;
+                
                 }
                 
                 else {
-      
-                        if (GetClientMenu(target_list[i]) == MenuSource_None) {
-        
-                                Show_Rules(target_list[i]);
-                        }
+                
+                        LogMessage("[ERROR] Command_rules(): unexpected value in int 'target_count'.");
                         
-                        else {
-        
-                                CreateTimer(3.0, CheckForMenu, target_list[i], TIMER_REPEAT);
-      
-                        }
-      
-                        ReplyToCommand(client,"[SM] %t %s", "Client Command Success", target_name);
-    
+                        return Plugin_Handled;
+                        
                 }
-  
+                
         }
         
-        return Plugin_Handled;
+        else {
+        
+                LogMessage("[ERROR] Command_rules(): unexpected value in int 'args'.");
+                
+                return Plugin_Handled;
+        
+        }
 
 }
 
-public void PanelHandler(Handle menu, MenuAction action, int param1, int param2) {
+////////////////////////////////////////////////////////////////////////////////
+//
+// LOCAL FUNCTIONS
+//
+////////////////////////////////////////////////////////////////////////////////
+
+void PanelHandler(Handle menu, MenuAction action, int param1, int param2) {
 	
 	if (action == MenuAction_Select) {
     
                 if (param2 == 1) {
       
-                        if (g_showmenuoptions) {
+                        if (g_showMenuOptions) {
         
                                 char timestamp[64];
         
@@ -519,9 +695,11 @@ public void PanelHandler(Handle menu, MenuAction action, int param1, int param2)
                 }
     
                 else {
-      
-                        PrintToChatAll("[SM] %s %t", clientname, "Player disagreed public");
+                        
+                        GetClientName(param1, g_clientName, sizeof(g_clientName));
+                        PrintToChatAll("[SM] %s %t", g_clientName, "Player disagreed public");
                         CreateTimer(0.5, KickPlayer, param1);
+                
                 }
   
         }
@@ -553,13 +731,14 @@ public void PanelHandler(Handle menu, MenuAction action, int param1, int param2)
 
 }
 
-public Action KickPlayer(Handle timer, any param1) {
+Action KickPlayer(Handle timer, any param1) {
   
-        if (IsClientInGame(param1)) {
+        // Check if the client is in game prior to kick.
+        if (IsClientInGame(param1) == true) {
     
-                GetClientName(param1, clientname, sizeof(clientname));
+                GetClientName(param1, g_clientName, sizeof(g_clientName));
                 KickClient(param1, "%t", "Player disagrees to rules");
-                LogMessage("%t %s", "Log kick message", clientname);
+                LogMessage("%t %s", "Log kick message", g_clientName);
         
         }
   
@@ -567,7 +746,7 @@ public Action KickPlayer(Handle timer, any param1) {
 
 }
  
-public Action Show_Rules(int client) {
+Action Show_Rules(int client) {
   
         char title[128];
         char question[128];
@@ -577,25 +756,27 @@ public Action Show_Rules(int client) {
         char ruleData[10][512];
         Handle panel = CreatePanel();
   
-        Format(title,127, "%T", "Rules menu title", client);
-        Format(question,127, "%T", "Agree Question", client);
-        Format(yes,127, "%T", "Yes Option", client);
-        Format(no,127, "%T", "No Option", client);
-        Format(close,127, "%T", "Close Option", client);
-        Format(ruleData[0], 512, "%T", "Rule Line 1", client);
-        Format(ruleData[1], 512, "%T", "Rule Line 2", client);
-        Format(ruleData[2], 512, "%T", "Rule Line 3", client);
-        Format(ruleData[3], 512, "%T", "Rule Line 4", client);
-        Format(ruleData[4], 512, "%T", "Rule Line 5", client);
-        Format(ruleData[5], 512, "%T", "Rule Line 6", client);
-        Format(ruleData[6], 512, "%T", "Rule Line 7", client);
-        Format(ruleData[7], 512, "%T", "Rule Line 8", client);
-        Format(ruleData[8], 512, "%T", "Rule Line 9", client);
-        Format(ruleData[9], 512, "%T", "Rule Line 10", client);
+        // Format the content table for the menu.
+        Format(title,       127, "%T", "Rules menu title", client);
+        Format(question,    127, "%T", "Agree Question",   client);
+        Format(yes,         127, "%T", "Yes Option",       client);
+        Format(no,          127, "%T", "No Option",        client);
+        Format(close,       127, "%T", "Close Option",     client);
+        Format(ruleData[0], 512, "%T", "Rule Line 1",      client);
+        Format(ruleData[1], 512, "%T", "Rule Line 2",      client);
+        Format(ruleData[2], 512, "%T", "Rule Line 3",      client);
+        Format(ruleData[3], 512, "%T", "Rule Line 4",      client);
+        Format(ruleData[4], 512, "%T", "Rule Line 5",      client);
+        Format(ruleData[5], 512, "%T", "Rule Line 6",      client);
+        Format(ruleData[6], 512, "%T", "Rule Line 7",      client);
+        Format(ruleData[7], 512, "%T", "Rule Line 8",      client);
+        Format(ruleData[8], 512, "%T", "Rule Line 9",      client);
+        Format(ruleData[9], 512, "%T", "Rule Line 10",     client);
   
-        SetPanelTitle(panel,title);
-        DrawPanelItem(panel, " ", ITEMDRAW_SPACER|ITEMDRAW_RAWLINE);
+        SetPanelTitle(panel, title);
+        DrawPanelItem(panel, " ", ITEMDRAW_SPACER|ITEMDRAW_RAWLINE); 
         
+        // Check for valid rules in the configuration file.
         for (int i = 0; i <= 9; i++) {
     
                 if (strlen(ruleData[i]) > 1) {
@@ -608,12 +789,12 @@ public Action Show_Rules(int client) {
   
         DrawPanelItem(panel, " ", ITEMDRAW_SPACER|ITEMDRAW_RAWLINE);
   
-        if (g_showmenuoptions) {
+        if (g_showMenuOptions == true) {
     
-                DrawPanelText(panel,question);
+                DrawPanelText(panel, question);
                 DrawPanelItem(panel, " ", ITEMDRAW_SPACER|ITEMDRAW_RAWLINE);
-                DrawPanelItem(panel,yes);
-                DrawPanelItem(panel,no);
+                DrawPanelItem(panel, yes);
+                DrawPanelItem(panel, no);
   
         }
         
@@ -623,10 +804,9 @@ public Action Show_Rules(int client) {
 
         }
 
-        SendPanelToClient(panel, client, PanelHandler, g_menutime);
+        SendPanelToClient(panel, client, PanelHandler, g_menuTime);
         CloseHandle(panel);
   
         return Plugin_Handled;
 
 }
-
