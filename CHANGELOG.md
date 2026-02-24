@@ -1,6 +1,6 @@
 ## [2.0.0] 2026-02-23
 
-A mostly re-write of the original plugin. This version updates the plugin to modern flows and standards, as well as adds additiona error notification to log and console.
+A mostly re-write of the original plugin. This version updates the plugin to modern flows and standards, as well as adds additional error notification to log and console.
 
 ### Added
 
@@ -12,7 +12,7 @@ A mostly re-write of the original plugin. This version updates the plugin to mod
 * Major formatting changes.
 * Reduction in reliance on global variables.
 * Functions are restricted to require scopes.
-* Made loops and if statements mroe explicit wherever possible.
+* Made loops and if statements more explicit wherever possible.
 * Reduced duplicate code.
 
 ### Fixed
