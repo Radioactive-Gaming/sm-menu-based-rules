@@ -78,7 +78,7 @@ public void OnPluginStart() {
 	LoadTranslations("showrules.phrases");
 	LoadTranslations("showrulesdata.phrases");
 	
-        // Set the language for the translations
+	// Set the language for the translations
 	int serverLanguage = GetServerLanguage();
 	GetLanguageInfo(serverLanguage, languageCode, LANGUAGE_CODE_LENGTH, language, LANGUAGE_LENGTH);
   
@@ -812,4 +812,5 @@ Action Show_Rules(int client) {
 	return Plugin_Handled;
 
 }
+
 
