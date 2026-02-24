@@ -58,11 +58,13 @@ UserMsg g_VGUIMenu;
 ////////////////////////////////////////////////////////////////////////////////
 
 public Plugin myinfo = {
+	
 	name        = PLUGIN_NAME,
 	author      = PLUGIN_AUTHOR,
 	description = PLUGIN_DESC,
 	version     = PLUGIN_VERSION,
 	url         = PLUGIN_URL
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -812,5 +814,6 @@ Action Show_Rules(int client) {
 	return Plugin_Handled;
 
 }
+
 
 
