@@ -11,13 +11,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#define LANGUAGE_LENGTH 3
-#define LANGUAGE_CODE_LENGTH 3
-#define PLUGIN_NAME "Menu Based Rules"
-#define PLUGIN_AUTHOR "XARiUS, X8ETr1x"
-#define PLUGIN_VERSION "2.0.0"
-#define PLUGIN_URL "https://github.com/Radioactive-Gaming/sm-menu-based-rules/"
-#define PLUGIN_DESC "Display menu of rules to clients when they join a server, or by console command."
+#define LANGUAGE_LENGTH 		3
+#define LANGUAGE_CODE_LENGTH 	3
+#define PLUGIN_NAME 			"Menu Based Rules"
+#define PLUGIN_AUTHOR 			"XARiUS, X8ETr1x"
+#define PLUGIN_VERSION 			"2.0.0"
+#define PLUGIN_URL 				"https://github.com/Radioactive-Gaming/sm-menu-based-rules/"
+#define PLUGIN_DESC 			"Display menu of rules to clients when they join a server, or by console command."
 
 // CVar handles, defined in OnPluginStart().
 Handle  g_CvarEnabled;
@@ -814,6 +814,7 @@ Action Show_Rules(int client) {
 	return Plugin_Handled;
 
 }
+
 
 
 
