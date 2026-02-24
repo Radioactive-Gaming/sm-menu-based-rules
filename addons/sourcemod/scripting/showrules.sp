@@ -5,6 +5,12 @@
 #include <sdktools>
 #include <clientprefs>
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// VARIABLES
+//
+////////////////////////////////////////////////////////////////////////////////
+
 #define LANGUAGE_LENGTH 3
 #define LANGUAGE_CODE_LENGTH 3
 #define PLUGIN_NAME "Menu Based Rules"
@@ -12,12 +18,6 @@
 #define PLUGIN_VERSION "2.0.0"
 #define PLUGIN_URL "https://github.com/Radioactive-Gaming/sm-menu-based-rules/"
 #define PLUGIN_DESC "Display menu of rules to clients when they join a server, or by console command."
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// VARIABLES
-//
-////////////////////////////////////////////////////////////////////////////////
 
 // CVar handles, defined in OnPluginStart().
 Handle  g_CvarEnabled;
@@ -45,7 +45,6 @@ bool    g_CookiesCached[MAXPLAYERS];            // Tracks if the players cookies
 bool    g_IntermissionCalled;                   // Tracks if a player is intermission i.e. after a player has died and is waiting to spawn.  
 char    g_clientName[MAX_NAME_LENGTH];          // Tracks player display name. Used for messages to the server chat.
 Handle  g_cookie;                               // The read-only client cookie that sets an expiration time stamp.
- 
 
 // Menu and language settings
 char    language[LANGUAGE_LENGTH];              // The language code of the server.
@@ -813,3 +812,4 @@ Action Show_Rules(int client) {
 	return Plugin_Handled;
 
 }
+
