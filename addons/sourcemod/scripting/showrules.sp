@@ -159,7 +159,7 @@ public void OnPluginStart() {
 
 public void OnConfigsExecuted() {
 
-        // Convert CVars to required data types.
+    // Convert CVars to required data types.
 	g_pluginEnabled = GetConVarBool(g_CvarEnabled);
 	g_menuTime = GetConVarInt(g_CvarMenuTime);
 	g_showOnJoin = GetConVarBool(g_CvarShowOnJoin);
@@ -810,3 +810,4 @@ Action Show_Rules(int client) {
         return Plugin_Handled;
 
 }
+
