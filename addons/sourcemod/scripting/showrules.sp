@@ -319,155 +319,6 @@ public void OnMapEnd() {
 
 }
 
-public void OnSettingChanged(ConVar convar, const char[] oldValue, const char[] newValue) {
-
-	if (convar == g_CvarMenuTime) {
-			
-		g_menuTime = StringToInt(newValue);
-
-	}
-
-	else if (convar == g_CvarDisplayAttempts) {
-	
-		g_displayAttempts = StringToInt(newValue);
-
-	}
-
-	else if (convar == g_CvarExpiration) {
-	
-		g_expiration = StringToInt(newValue) * 3600;
-
-	}
-
-	else if (convar == g_CvarEnabled) {
-
-		if (newValue[0] == '1') {
-
-		g_pluginEnabled = true;
-			
-			LogMessage("[INFO] Plugin enabled, executing.");
-		
-		}
-
-		else if (newValue[0] == '0') {
-		
-			g_pluginEnabled = false;
-			LogMessage("[INFO] Plugin disabled.");
-		
-		}
-		
-		else {
-		
-			LogMessage("[ERROR] Unexpected value for sm_showrules_enabled.");
-		
-		}
-			
-	}
-
-	else if (convar == g_CvarDisplayFailureKick) {
-
-		if (newValue[0] == '1') {
-	
-			g_displayFailureKick = true;
-			LogMessage("[INFO] Kicking players on menu display failure.");
-		
-		}
-
-		else if (newValue[0] == '0') {
-
-			g_displayFailureKick = false;
-			LogMessage("[INFO] Ignoring menu display failures.");
-		
-		}
-		
-		else {
-		
-			LogMessage("[ERROR] Unexpected value for sm_showrules_displayfailurekick.");
-		
-		}
-
-	}
-
-	else if (convar == g_CvarShowMenuOptions) {
-
-		if (newValue[0] == '1') {
-	
-			g_showMenuOptions = true;
-			LogMessage("[INFO] Menu options enabled.");
-		
-		}
-
-		else if (newValue[0] == '0') {
-
-			g_showMenuOptions = false;
-			LogMessage("[INFO] Menu options disabled.");
-
-		}
-		
-		else {
-		
-			LogMessage("[ERROR] Unexpected value for sm_showrules_showmenuoptions.");
-		
-		}
-
-	}
-
-	else if (convar == g_CvarShowOnJoin) {
-
-		if (newValue[0] == '1') {
-	
-			g_showOnJoin = true;
-			LogMessage("[INFO] Rules on join enabled.");
-				
-		}
-		
-		else if (newValue[0] == '0') {
-
-			g_showOnJoin = false;
-			LogMessage("[INFO] Rules on join disabled.");
-
-		}
-		
-		else {
-		
-			LogMessage("[ERROR] Unexpected value for sm_showrules_showonjoin.");
-		
-		}
-	
-	}
-
-	else if (convar == g_CvarShowToAdmins) {
-
-		if (newValue[0] == '1') {
-	
-			g_showToAdmins = true;
-			LogMessage("[INFO] Rules to admins enabled.");
-		
-		}
-
-		else if (newValue[0] == '0') {
-
-			g_showToAdmins = false;
-			LogMessage("[INFO] Rules to admins disabled.");
-
-		}
-		
-		else {
-		
-			LogMessage("[ERROR] Unexpected value for sm_showrules_showtoadmins.");
-		
-		}
-
-	}
-	
-	else {
-	
-		LogMessage("[WARN] Unexpected CVar, skipping.");
-	
-	}
-
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 //
 // ACTIONS
@@ -674,71 +525,7 @@ Action Command_rules(int client, int args) {
 
 }
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// LOCAL FUNCTIONS
-//
-////////////////////////////////////////////////////////////////////////////////
-
-void PanelHandler(Handle menu, MenuAction action, int param1, int param2) {
-	
-	if (action == MenuAction_Select) {
-    
-		if (param2 == 1) {
-
-			if (g_showMenuOptions) {
-
-				char timestamp[64];
-
-				IntToString(GetTime(), timestamp, sizeof(timestamp));
-				SetClientCookie(param1, g_cookie, timestamp);
-				PrintToChat(param1,"[SM] %t", "Player agrees to rules");
-			
-			}
-
-		}
-
-		else {
-				
-			GetClientName(param1, g_clientName, sizeof(g_clientName));
-			PrintToChatAll("[SM] %s %t", g_clientName, "Player disagreed public");
-			CreateTimer(0.5, KickPlayer, param1);
-		
-		}
-  
-	}
-
-	else if (action == MenuAction_Cancel) {
-    
-		// -1 = Client disconnected
-		if (param2 == -1) {
-
-			return;
-		
-		} 
-
-		// -5 = Menu Timeout
-		else if (param2 == -5) {
-
-			CreateTimer(0.5, KickPlayer, param1); 
-		
-		}
-
-		// -4 = Unable to display panel | -2 = Interrupted by another menu
-		else if ((param2 == -4 || param2 == -2)) {
-
-			CreateTimer(3.0, CheckForMenu, param1, TIMER_REPEAT);
-
-		} 
-  
-	}
-
-}
-
 Action KickPlayer(Handle timer, any param1) {
-  
-	// Check if the client is in game prior to kick.
-	if (IsClientInGame(param1) == true) {
 
 		GetClientName(param1, g_clientName, sizeof(g_clientName));
 		KickClient(param1, "%t", "Player disagrees to rules");
@@ -815,6 +602,136 @@ Action Show_Rules(int client) {
 
 }
 
+////////////////////////////////////////////////////////////////////////////////
+//
+// LOCAL FUNCTIONS
+//
+////////////////////////////////////////////////////////////////////////////////
 
+void PanelHandler(Handle menu, MenuAction action, int param1, int param2) {
+	
+	if (action == MenuAction_Select) {
+    
+		if (param2 == 1) {
 
+			if (g_showMenuOptions) {
 
+				char timestamp[64];
+
+				IntToString(GetTime(), timestamp, sizeof(timestamp));
+				SetClientCookie(param1, g_cookie, timestamp);
+				PrintToChat(param1,"[SM] %t", "Player agrees to rules");
+			
+			}
+
+		}
+
+		else {
+				
+			GetClientName(param1, g_clientName, sizeof(g_clientName));
+			PrintToChatAll("[SM] %s %t", g_clientName, "Player disagreed public");
+			CreateTimer(0.5, KickPlayer, param1);
+		
+		}
+  
+	}
+
+	else if (action == MenuAction_Cancel) {
+    
+		// -1 = Client disconnected
+		if (param2 == -1) {
+
+			return;
+		
+		} 
+
+		// -5 = Menu Timeout
+		else if (param2 == -5) {
+
+			CreateTimer(0.5, KickPlayer, param1); 
+		
+		}
+
+		// -4 = Unable to display panel | -2 = Interrupted by another menu
+		else if ((param2 == -4 || param2 == -2)) {
+
+			CreateTimer(3.0, CheckForMenu, param1, TIMER_REPEAT);
+
+		} 
+  
+	}
+
+}
+
+void OnSettingChanged(ConVar convar, const char[] oldValue, const char[] newValue) {
+
+		else if (newValue[0] == '0') {
+
+			g_showMenuOptions = false;
+			LogMessage("[INFO] Menu options disabled.");
+
+		}
+		
+		else {
+		
+			LogMessage("[ERROR] Unexpected value for sm_showrules_showmenuoptions.");
+		
+		}
+
+	}
+
+	else if (convar == g_CvarShowOnJoin) {
+
+		if (newValue[0] == '1') {
+	
+			g_showOnJoin = true;
+			LogMessage("[INFO] Rules on join enabled.");
+				
+		}
+		
+		else if (newValue[0] == '0') {
+
+			g_showOnJoin = false;
+			LogMessage("[INFO] Rules on join disabled.");
+
+		}
+		
+		else {
+		
+			LogMessage("[ERROR] Unexpected value for sm_showrules_showonjoin.");
+		
+		}
+	
+	}
+
+	else if (convar == g_CvarShowToAdmins) {
+
+		if (newValue[0] == '1') {
+	
+			g_showToAdmins = true;
+			LogMessage("[INFO] Rules to admins enabled.");
+		
+		}
+
+		else if (newValue[0] == '0') {
+
+			g_showToAdmins = false;
+			LogMessage("[INFO] Rules to admins disabled.");
+
+		}
+		
+		else {
+		
+			LogMessage("[ERROR] Unexpected value for sm_showrules_showtoadmins.");
+		
+		}
+
+	}
+	
+	else {
+	
+		LogMessage("[WARN] Unexpected CVar, skipping.");
+	
+	}
+
+}
