@@ -11,7 +11,7 @@ A mostly re-write of the original plugin. This version updates the plugin to mod
 
 * Major formatting changes.
 * Reduction in reliance on global variables.
-* Functions are restricted to require scopes.
+* Functions are restricted to required scopes.
 * Made loops and if statements more explicit wherever possible.
 * Reduced duplicate code.
 
