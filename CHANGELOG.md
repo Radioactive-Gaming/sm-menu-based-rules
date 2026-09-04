@@ -1,3 +1,11 @@
+## [2.0.1] 2026-09-04
+
+### Fixed
+
+* Removed white spaces from empty lines.
+* Converted tabs to spaces.
+* An issue where code was missing.
+
 ## [2.0.0] 2026-02-23
 
 A mostly re-write of the original plugin. This version updates the plugin to modern flows and standards, as well as adds additional error notification to log and console.
