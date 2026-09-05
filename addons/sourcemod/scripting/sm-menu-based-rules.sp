@@ -15,7 +15,7 @@
 #define LANGUAGE_CODE_LENGTH 3
 #define PLUGIN_NAME          "Menu Based Rules"
 #define PLUGIN_AUTHOR        "XARiUS, X8ETr1x, CaptainUndies"
-#define PLUGIN_VERSION       "2.0.1"
+#define PLUGIN_VERSION       "2.0.2"
 #define PLUGIN_URL           "https://github.com/Radioactive-Gaming/sm-menu-based-rules/"
 #define PLUGIN_DESC          "Display menu of rules to clients when they join a server, or by console command."
 
