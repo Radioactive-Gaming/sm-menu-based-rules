@@ -1,3 +1,9 @@
+## [2.0.2] 2026-09-05
+
+### Changed
+
+- File name to match new automation.
+
 ## [2.0.1] 2026-09-04
 
 ### Fixed
