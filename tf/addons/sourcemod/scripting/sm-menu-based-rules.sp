@@ -20,14 +20,14 @@
 #define PLUGIN_DESC          "Display menu of rules to clients when they join a server, or by console command."
 
 // CVar handles, defined in OnPluginStart().
-Handle  g_CvarEnabled;
-Handle  g_CvarMenuTime;
-Handle  g_CvarShowOnJoin;
-Handle  g_CvarShowToAdmins;
-Handle  g_CvarDisplayAttempts;
-Handle  g_CvarDisplayFailureKick;
-Handle  g_CvarShowMenuOptions;
-Handle  g_CvarExpiration;
+ConVar  g_CvarEnabled;
+ConVar  g_CvarMenuTime;
+ConVar  g_CvarShowOnJoin;
+ConVar  g_CvarShowToAdmins;
+ConVar  g_CvarDisplayAttempts;
+ConVar  g_CvarDisplayFailureKick;
+ConVar  g_CvarShowMenuOptions;
+ConVar  g_CvarExpiration;
 
 // Variables used to change CVar handle values after AutoExecConfig()
 bool    g_displayFailureKick;                   // Maps to g_CvarDisplayFailureKick.
