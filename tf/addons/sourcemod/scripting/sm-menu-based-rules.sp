@@ -82,22 +82,16 @@ public void OnPluginStart()
     g_cookie = RegClientCookie("showrules", "Rules Agreement Timestamp", CookieAccess_Protected);
 
     // Late load support to ensure cookies are loaded for all players.
-    for (int i = MaxClients; i > 0; --i)
+    for (int i = 1; i <= MaxClients; i++)
     {
-        if (AreClientCookiesCached(i) == false)
-        {
-            continue;
-        }
-        else if (AreClientCookiesCached(i) == true)
-        {
-            OnClientCookiesCached(i);
-        }
-        else
-        {
-            LogMessage("[ERROR] OnPluginStart(): AreClientCookiesCached contains a non-boolean value.");
+        bool cached = AreClientCookiesCached(i);
 
+        if (!cached)
+        {
             continue;
         }
+
+        OnClientCookiesCached(i);
     }
 
     // Set CVars
