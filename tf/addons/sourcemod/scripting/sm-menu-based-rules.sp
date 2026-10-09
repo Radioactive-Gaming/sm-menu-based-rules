@@ -13,6 +13,7 @@
 
 #define LANGUAGE_LENGTH      3
 #define LANGUAGE_CODE_LENGTH 3
+#define MAX_LINE_WIDTH       60
 #define PLUGIN_NAME          "Menu Based Rules"
 #define PLUGIN_AUTHOR        "XARiUS, X8ETr1x, CaptainUndies"
 #define PLUGIN_VERSION       "2.0.2"
@@ -106,7 +107,8 @@ public void OnPluginStart()
     g_CvarExpiration = CreateConVar("sm_showrules_expiration", "24", "Number of hours before the previous terms agreement expires.");
 
     // Register server commands
-    RegAdminCmd("sm_showrules", Command_rules, ADMFLAG_KICK, "sm_showrules <#userid|name>");
+    AddCommandListener(OnRulesCommand, "say");
+    AddCommandListener(OnRulesCommand, "say_team");
 
     // Create hooks for custom CVar values
     HookConVarChange(g_CvarEnabled, OnSettingChanged);
@@ -348,86 +350,96 @@ Action UserMsg_VGUIMenu(UserMsg msg_id, Handle bf, const int[] players, int play
     }
 }
 
-Action Command_rules(int client, int args)
+public Action OnRulesCommand(int player_index, const char[] command, int argc)
 {
-    // Check for the required number of arguments.
-    if (args < 1)
+    /*
+     * Intercepts the showrules command and calls the appropriate function based
+     * on the captured command.
+     */
+
+    char arg_1[MAX_LINE_WIDTH];
+    char target_name[MAX_TARGET_LENGTH];
+    int target_list[MAXPLAYERS];
+    int target_count;
+    bool tn_is_ml;
+
+    /* Check if the player has the correct admin flag */
+    bool has_admin_flag = GetAdminFlag(view_as<AdminId>(player_index), Admin_Kick, Access_Real);
+
+    if (!has_admin_flag)
     {
-        ReplyToCommand(client, "[SM] Usage: sm_showrules <#userid|name>");
+        ReplyToCommand(player_index, "[Show Rules]: You do not have access to this command.");
 
         return Plugin_Handled;
     }
-    else if (args >= 1)
+
+    /* Return if there are no arguments. */
+    if (argc < 1)
     {
-        // Grab the entire argument string.
-        char Arguments[256];
-        char arg[65];
+        ReplyToCommand(player_index, "[Show Rules] Usage: sm_showrules <player name>");
 
-        GetCmdArgString(Arguments, 256);
-        BreakString(Arguments, arg, 65);
+        return Plugin_Handled;
+    }
 
-        // Search for the player based on the provided string.
-        char target_name[MAX_TARGET_LENGTH];
-        int target_list[MAXPLAYERS];
-        int target_count;
-        bool tn_is_ml;
+    /* Return if the client index is inelligible. */
+    if (!ClientCheck(player_index))
+    {
+        return Plugin_Handled;
+    }
 
-        target_count = ProcessTargetString(arg, client, target_list, MAXPLAYERS, COMMAND_FILTER_CONNECTED, target_name, MAX_TARGET_LENGTH, tn_is_ml);
+    // Search for the player
+    GetCmdArg(1, arg_1, sizeof(arg_1));
+    target_count = ProcessTargetString(arg_1, player_index, target_list, MAXPLAYERS, COMMAND_FILTER_CONNECTED, target_name, MAX_TARGET_LENGTH, tn_is_ml);
 
-        // Return if there's no pattern match.
-        if (target_count <= 0)
+    // Return if there's no pattern match.
+    if (target_count <= 0)
+    {
+        ReplyToTargetError(player_index, target_count);
+
+        return Plugin_Handled;
+    }
+
+    // Loop through the results.
+    for (int i = 0; i < target_count; i++)
+    {
+        // Abort if the client is a bot or not yet in game.
+        bool client_connected = IsClientConnected(target_list[i]);
+        bool fake_client = IsFakeClient(target_list[i]);
+        bool in_game = IsClientInGame(target_list[i]);
+
+        if (fake_client)
         {
-            ReplyToTargetError(client, target_count);
+            ReplyToCommand(player_index, "[Show Rules]: Client %s is not a valid client.", target_name);
 
             return Plugin_Handled;
         }
-        else if (target_count > 0)
+
+        if (!client_connected || !in_game)
         {
-            // Loop through the results.
-            for (int i = 0; i < target_count; i++)
-            {
-                // Abort if the client is a bot or not yet in game.
-                if ((IsClientConnected(target_list[i]) == false) || (IsFakeClient(target_list[i]) == true) || (IsClientInGame(target_list[i]) == false))
-                {
-                    ReplyToCommand(client, "[SM] Client %s has not finished connecting or is timing out.  Please try again.", target_name);
-
-                    return Plugin_Handled;
-                }
-                else
-                {
-                    // Check the current menu status.
-                    MenuSource menuSrc = GetClientMenu(client);
-
-                    if (menuSrc == MenuSource_None)
-                    {
-                        Show_Rules(target_list[i]);
-                    }
-                    else
-                    {
-                        CreateTimer(3.0, CheckForMenu, target_list[i], TIMER_REPEAT);
-                    }
-
-                    ReplyToCommand(client,"[SM] %t %s", "Client Command Success", target_name);
-
-                    return Plugin_Handled;
-                }
-            }
+            ReplyToCommand(player_index, "[Show Rules]: Client %s has not finished connecting or is timing out.  Please try again.", target_name);
 
             return Plugin_Handled;
+        }
+
+        // Check the current menu status.
+        MenuSource menuSrc = GetClientMenu(target_list[i]);
+
+        if (menuSrc == MenuSource_None)
+        {
+            Show_Rules(target_list[i]);
         }
         else
         {
-            LogMessage("[ERROR] Command_rules(): unexpected value in int 'target_count'.");
-
-            return Plugin_Handled;
+            CreateTimer(3.0, CheckForMenu, target_list[i], TIMER_REPEAT);
         }
-    }
-    else
-    {
-        LogMessage("[ERROR] Command_rules(): unexpected value in int 'args'.");
+
+        ReplyToCommand(player_index,"[Show Rules]: %t %s", "Client Command Success", target_name);
 
         return Plugin_Handled;
     }
+
+    return Plugin_Handled;
+
 }
 
 Action KickPlayer(Handle timer, any param1)
@@ -506,6 +518,45 @@ Action Show_Rules(int client)
 // LOCAL FUNCTIONS
 //
 ////////////////////////////////////////////////////////////////////////////////
+
+bool ClientCheck(int client)
+{
+    /*
+     * Performs various checks to ensure the client index is a valid player index value.
+     */
+
+    /* Check for out-of-bounds. */
+    if ( client <= 0 || client > MaxClients )
+    {
+        return false;
+    }
+
+    /* Check if the client is connected. */
+    if (!IsClientConnected(client))
+    {
+        return false;
+    }
+
+    /* Check if the client is currently in-game. */
+    if (!IsClientInGame(client))
+    {
+        return false;
+    }
+
+    /* Check if the client is the replay bot. */
+    if (IsClientReplay(client))
+    {
+        return false;
+    }
+
+    /* Check if the client is the SourceTV bot. */
+    if (IsClientSourceTV(client))
+    {
+        return false;
+    }
+
+    return true;
+}
 
 void PanelHandler(Handle menu, MenuAction action, int param1, int param2)
 {
