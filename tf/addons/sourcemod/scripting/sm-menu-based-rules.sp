@@ -47,8 +47,6 @@ char    g_clientName[MAX_NAME_LENGTH];          // Tracks player display name. U
 Handle  g_cookie;                               // The read-only client cookie that sets an expiration time stamp.
 
 // Menu and language settings
-char    language[LANGUAGE_LENGTH];              // The language code of the server.
-char    languageCode[LANGUAGE_CODE_LENGTH];     // Follows ISO 639 https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes
 UserMsg g_VGUIMenu;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,10 +77,6 @@ public void OnPluginStart()
     LoadTranslations("common.phrases");
     LoadTranslations("showrules.phrases");
     LoadTranslations("showrulesdata.phrases");
-
-    // Set the language for the translations
-    int serverLanguage = GetServerLanguage();
-    GetLanguageInfo(serverLanguage, languageCode, LANGUAGE_CODE_LENGTH, language, LANGUAGE_LENGTH);
 
     // Register a cookie for the time of rule acceptance.
     g_cookie = RegClientCookie("showrules", "Rules Agreement Timestamp", CookieAccess_Protected);
